@@ -371,7 +371,7 @@
   <div class="wrap">
     <div class="hero">
       <h1>🏫 多比的分帳學院 🧦</h1>
-      <p>🔮小幫手多比提醒您，送出後收到line通知即為成功，或是可查詢下方登記資料唷！🔮</p>
+      <p>主畫面以記帳為主，查帳頁專心看誰欠誰、明細表與匯出。支援 Google Sheet、LINE 群組通知與手機操作。</p>
     </div>
 
     <div class="tabs">
@@ -462,8 +462,8 @@
       <div class="card">
         <h2 class="section-title">記帳檢查</h2>
         <div class="summary-card">
-          <div class="summary-row"><span>總金額</span><strong id="sumTotal">0</strong></div>
-          <div class="summary-row"><span>已分配</span><strong id="sumAssigned">0</strong></div>
+          <div class="summary-row"><span>總金額</span><strong id="sumTotal">300</strong></div>
+          <div class="summary-row"><span>已分配</span><strong id="sumAssigned">300</strong></div>
           <div class="summary-row"><span>差額</span><strong id="sumDiff">0</strong></div>
           <div class="summary-row"><span>狀態</span><strong id="sumStatus" class="good">✅ 正常</strong></div>
         </div>
@@ -644,8 +644,8 @@
       const checkoutFromEl = document.getElementById('checkoutFrom');
       const settingsPage = document.getElementById('page-settings');
       currentUserEl.value = CURRENT_USER;
-      payerEl.value = CURRENT_USER;
-      checkoutFromEl.value = CURRENT_USER;
+      if (!payerEl.value || !PEOPLE.includes(payerEl.value)) payerEl.value = CURRENT_USER;
+      if (!checkoutFromEl.value || !PEOPLE.includes(checkoutFromEl.value)) checkoutFromEl.value = CURRENT_USER;
       if (APP_ROLE === 'admin') {
         currentUserEl.disabled = false;
         payerEl.disabled = false;
@@ -1158,24 +1158,11 @@
       const assigned = roundInt(allocation.reduce(function(sum, item) { return sum + item.amount; }, 0));
       const diff = total - assigned;
       const check = validateForm();
-      const status = document.getElementById('sumStatus');
-
-      if (!total || total <= 0) {
-        document.getElementById('sumTotal').textContent = '0';
-        document.getElementById('sumAssigned').textContent = formatMoney(assigned);
-        document.getElementById('sumDiff').textContent = '0';
-        status.textContent = '—';
-        status.className = 'info';
-        document.getElementById('validationNote').textContent = '請先輸入總金額。';
-        renderGroupNotice();
-        updateSubmitButtonState();
-        return;
-      }
-
       const ok = check.ok && diff === 0;
       document.getElementById('sumTotal').textContent = formatMoney(total);
       document.getElementById('sumAssigned').textContent = formatMoney(assigned);
       document.getElementById('sumDiff').textContent = formatMoney(diff);
+      const status = document.getElementById('sumStatus');
       status.textContent = ok ? '✅ 正常' : '❌ 需修正';
       status.className = ok ? 'good' : 'warn';
       document.getElementById('validationNote').textContent = ok ? '可送出。' : (check.ok ? '分配總和與總額不一致。' : check.message);
@@ -1264,9 +1251,7 @@
       editingEntryId = null;
       document.getElementById('payer').value = CURRENT_USER;
       document.getElementById('checkoutFrom').value = CURRENT_USER;
-      document.getElementById('totalAmount').value = '';
-      document.getElementById('checkoutAmount').value = '';
-      document.getElementById('checkoutNote').value = '已轉帳';
+      document.getElementById('totalAmount').value = '300';
       document.getElementById('note').value = '';
       document.querySelector('input[name="mode"][value="split3"]').checked = true;
       refreshModeSelectionUI();
@@ -1648,6 +1633,8 @@
     refreshModeSelectionUI();
     buildDetailFields();
     applyRoleUI();
+    document.getElementById('checkoutFrom').value = 'Rainie';
+    document.getElementById('checkoutTo').value = 'Beth';
     renderCheckoutPreview();
     recalculate();
     renderHistory();
