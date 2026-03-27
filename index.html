@@ -654,8 +654,8 @@
         settingsPage.classList.remove('hidden');
       } else {
         currentUserEl.disabled = true;
-        payerEl.disabled = true;
-        checkoutFromEl.disabled = true;
+        payerEl.disabled = false;
+        checkoutFromEl.disabled = false;
         settingsPage.classList.add('hidden');
       }
       renderCheckoutPreview();
