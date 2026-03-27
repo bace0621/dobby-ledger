@@ -46,25 +46,6 @@
     }
     .hero h1 { margin: 0 0 8px; font-size: 24px; line-height: 1.25; }
     .hero p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 14px; }
-    .role-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 10px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 800;
-      background: #fff;
-      border: 1px solid #f0d5e2;
-      color: var(--muted);
-    }
-    .locked-user {
-      margin-top: 8px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .is-hidden { display: none !important; }
     .card { padding: 16px; }
     .section-title { font-size: 16px; font-weight: 800; margin: 0 0 12px; }
     .subtle-title { font-size: 14px; font-weight: 800; margin: 0 0 10px; }
@@ -93,6 +74,7 @@
 
     .page { display: none; }
     .page.active { display: block; }
+    .hidden { display: none !important; }
 
     .field { margin-bottom: 12px; }
     .field:last-child { margin-bottom: 0; }
@@ -226,11 +208,6 @@
       border-radius: 14px;
       font-size: 13px;
     }
-    button[disabled] {
-      opacity: .55;
-      cursor: not-allowed;
-      box-shadow: none;
-    }
 
     .helper, .muted { color: var(--muted); font-size: 12px; line-height: 1.6; }
     .helper { margin-top: 10px; }
@@ -272,6 +249,9 @@
 
     .settlement-card { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
     .history-card { display: grid; gap: 10px; }
+    .history-card.dimmed { opacity: 0.56; background: #fffafc; }
+    .history-card.dimmed .history-title, .history-card.dimmed .history-meta { color: #9f8a96; }
+    .history-card.dimmed .tag { opacity: 0.72; }
     .history-top {
       display: flex;
       justify-content: space-between;
@@ -385,11 +365,15 @@
 <body>
   <div class="wrap">
     <div class="hero">
-      <div class="role-badge" id="roleBadge">✨ 載入中</div>
       <h1>🏫 多比的分帳學院 🧦</h1>
       <p>主畫面以記帳為主，查帳頁專心看誰欠誰、明細表與匯出。支援 Google Sheet、LINE 群組通知與手機操作。</p>
     </div>
-    <!-- top tabs removed -->
+
+    <div class="tabs">
+      <button class="tab-btn active" data-page="record" onclick="switchPage('record')">🧾 記帳</button>
+      <button class="tab-btn" data-page="ledger" onclick="switchPage('ledger')">📊 查帳</button>
+      <button class="tab-btn" data-page="settings" onclick="switchPage('settings')">⚙️ 設定</button>
+    </div>
 
     <section class="page active" id="page-record">
       <div class="card">
@@ -402,7 +386,6 @@
             <option>Ann</option>
             <option>普忠家用</option>
           </select>
-          <div class="locked-user" id="currentUserHint"></div>
         </div>
         <div class="field">
           <label>付款人</label>
@@ -525,14 +508,14 @@
           <button class="btn-sub" onclick="copyCheckoutPreview()">📋 複製清帳文字</button>
         </div>
       </div>
+    
 
       <div class="card">
-        <h2 class="section-title">我的登打紀錄</h2>
-        <div class="helper" id="historyHint">記帳後可直接在這裡確認自己剛剛送出的紀錄，避免重複登打。</div>
+        <h2 class="section-title">登打紀錄</h2>
+        <div class="helper">全部紀錄都會顯示；不是自己建立的紀錄會反灰，避免重複登打同一筆。</div>
         <div class="history-list" id="historyList"></div>
       </div>
-
-    </section>
+</section>
 
     <section class="page" id="page-ledger">
       <div class="card">
@@ -572,6 +555,8 @@
           <button class="btn-sub" onclick="copyTableSummary()">📋 複製表格摘要</button>
         </div>
       </div>
+
+
     </section>
 
     <section class="page" id="page-settings">
@@ -608,153 +593,20 @@
   </div>
 
   <div class="sticky-bar">
-    <div class="sticky-inner" id="bottomNav"></div>
+    <div class="sticky-inner" id="stickyNavWrap"></div>
   </div>
 
   <div class="toast" id="toast">已完成</div>
 
   <script>
     let CURRENT_USER = 'Beth';
+    const USER_STORAGE_KEY = 'homeExpenseCurrentUser';
     let APP_CONFIG = { apiUrl: '', notifyUrl: '', sheetId: '' };
     let entries = [];
     let editingEntryId = null;
     let sequence = 1;
-    let APP_ROLE = 'auto';
-    let CURRENT_PAGE = 'record';
 
     const PEOPLE = ['Beth', 'Rainie', 'Ann', '普忠家用'];
-    const USER_ALIASES = {
-      beth: 'Beth',
-      rainie: 'Rainie',
-      ann: 'Ann',
-      home: '普忠家用',
-      family: '普忠家用',
-      '普忠家用': '普忠家用',
-      Beth: 'Beth',
-      Rainie: 'Rainie',
-      Ann: 'Ann'
-    };
-    const STORAGE_KEYS = {
-      currentUser: 'dobbySplit.currentUser',
-      appRole: 'dobbySplit.appRole',
-      notifyLog: 'dobbySplit.notifyLog'
-    };
-    const NOTIFY_DEDUPE_WINDOW_MS = 120000;
-
-
-    function loadNotifyLog() {
-      try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEYS.notifyLog) || '{}');
-      } catch (error) {
-        return {};
-      }
-    }
-
-    function saveNotifyLog(log) {
-      localStorage.setItem(STORAGE_KEYS.notifyLog, JSON.stringify(log));
-    }
-
-    function createNotifySignature(entryId, text) {
-      return String(entryId || '') + '::' + String(text || '');
-    }
-
-    function getEntryNotifyMeta(entry) {
-      const log = loadNotifyLog();
-      const candidates = Object.keys(log).filter(function(key) {
-        return key.indexOf(String(entry.id || '') + '::') === 0;
-      }).map(function(key) { return log[key]; });
-      if (!candidates.length) return null;
-      candidates.sort(function(a, b) {
-        return String(b.sentAt || '').localeCompare(String(a.sentAt || ''));
-      });
-      return candidates[0];
-    }
-    function normalizeUserName(value) {
-      if (!value) return '';
-      return USER_ALIASES[value] || USER_ALIASES[String(value).trim().toLowerCase()] || '';
-    }
-
-    function getUrlParams() {
-      return new URLSearchParams(window.location.search);
-    }
-
-    function detectRole() {
-      const params = getUrlParams();
-      const roleParam = (params.get('role') || params.get('mode') || '').trim().toLowerCase();
-      const adminFlag = (params.get('admin') || '').trim();
-      if ('auto' === 'admin') return 'admin';
-      if ('auto' === 'user') return 'user';
-      if (roleParam === 'admin' || roleParam === 'editor' || adminFlag === '1' || adminFlag.toLowerCase() === 'true') {
-        localStorage.setItem(STORAGE_KEYS.appRole, 'admin');
-        return 'admin';
-      }
-      if (roleParam === 'user') {
-        localStorage.setItem(STORAGE_KEYS.appRole, 'user');
-        return 'user';
-      }
-      return localStorage.getItem(STORAGE_KEYS.appRole) === 'admin' ? 'admin' : 'user';
-    }
-
-    function detectInitialUser() {
-      const params = getUrlParams();
-      const queryUser = normalizeUserName(params.get('user'));
-      const savedUser = normalizeUserName(localStorage.getItem(STORAGE_KEYS.currentUser));
-      return queryUser || savedUser || 'Beth';
-    }
-
-    function persistCurrentUser() {
-      localStorage.setItem(STORAGE_KEYS.currentUser, CURRENT_USER);
-    }
-
-    function updateRoleUI() {
-      const roleBadge = document.getElementById('roleBadge');
-      const currentUserSelect = document.getElementById('currentUser');
-      const currentUserHint = document.getElementById('currentUserHint');
-      const settingsPage = document.getElementById('page-settings');
-      const apiUrl = document.getElementById('apiUrl');
-      const notifyUrl = document.getElementById('notifyUrl');
-      const sheetId = document.getElementById('sheetId');
-
-      if (APP_ROLE === 'admin') {
-        roleBadge.textContent = '⚙️ 編輯者模式';
-        currentUserSelect.disabled = false;
-        currentUserHint.textContent = '可切換模擬不同使用者。';
-        settingsPage.classList.remove('is-hidden');
-        [apiUrl, notifyUrl, sheetId].forEach(function(el) { el.disabled = false; });
-      } else {
-        roleBadge.textContent = '✨ 使用者模式';
-        currentUserSelect.disabled = true;
-        currentUserHint.textContent = '此版本會固定以目前使用者身分操作。';
-        settingsPage.classList.add('is-hidden');
-        [apiUrl, notifyUrl, sheetId].forEach(function(el) { el.disabled = true; });
-        if (CURRENT_PAGE === 'settings') CURRENT_PAGE = 'record';
-      }
-    }
-
-    function renderBottomNav() {
-      const nav = document.getElementById('bottomNav');
-      if (!nav) return;
-      nav.innerHTML = '';
-
-      function makeButton(page, label, active) {
-        const button = document.createElement('button');
-        button.className = 'sticky-nav' + (active ? ' active' : '');
-        button.dataset.page = page;
-        button.textContent = label;
-        button.onclick = function() { switchPage(page); };
-        nav.appendChild(button);
-      }
-
-      if (APP_ROLE === 'admin') {
-        makeButton('record', '🧾 記帳', CURRENT_PAGE === 'record');
-        makeButton('ledger', '📊 查帳', CURRENT_PAGE === 'ledger');
-        makeButton('settings', '⚙️ 設定', CURRENT_PAGE === 'settings');
-        return;
-      }
-
-      if (CURRENT_PAGE === 'ledger') makeButton('record', '🧾 記帳', false);
-      else makeButton('ledger', '📊 查帳', false);
-    }
 
     function showToast(message) {
       const toast = document.getElementById('toast');
@@ -765,15 +617,47 @@
     }
 
     function switchPage(page) {
-      if (APP_ROLE !== 'admin' && page === 'settings') page = 'record';
-      CURRENT_PAGE = page;
       document.querySelectorAll('.page').forEach(function(el) {
         el.classList.toggle('active', el.id === 'page-' + page);
       });
-      renderBottomNav();
+      document.querySelectorAll('.tab-btn').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.page === page);
+      });
+      renderStickyNav(page);
       if (page === 'ledger') {
         renderLedgerPage();
       }
+      if (page === 'record') {
+        renderHistory();
+      }
+    }
+
+
+    function initCurrentUser() {
+      const params = new URLSearchParams(window.location.search);
+      const urlUser = (params.get('user') || '').trim();
+      const savedUser = (localStorage.getItem(USER_STORAGE_KEY) || '').trim();
+      const initialUser = PEOPLE.includes(urlUser) ? urlUser : (PEOPLE.includes(savedUser) ? savedUser : CURRENT_USER);
+      CURRENT_USER = initialUser;
+      document.getElementById('currentUser').value = CURRENT_USER;
+      document.getElementById('payer').value = CURRENT_USER;
+    }
+
+    function renderStickyNav(activePage) {
+      const wrap = document.getElementById('stickyNavWrap');
+      if (!wrap) return;
+      const buttons = [];
+      if (activePage === 'record') {
+        buttons.push({ page: 'ledger', label: '📊 查帳' });
+      } else if (activePage === 'ledger') {
+        buttons.push({ page: 'record', label: '🧾 記帳' });
+      } else if (activePage === 'settings') {
+        buttons.push({ page: 'record', label: '🧾 記帳' });
+        buttons.push({ page: 'ledger', label: '📊 查帳' });
+      }
+      wrap.innerHTML = buttons.map(function(btn) {
+        return '<button class="sticky-nav" data-page="' + btn.page + '" onclick="switchPage('' + btn.page + '')">' + btn.label + '</button>';
+      }).join('');
     }
 
     function selectedMode() {
@@ -856,8 +740,6 @@
       if (apiUrl) params.set('apiUrl', apiUrl);
       if (notifyUrl) params.set('notifyUrl', notifyUrl);
       if (sheetId) params.set('sheetId', sheetId);
-      params.set('user', CURRENT_USER === '普忠家用' ? 'home' : CURRENT_USER.toLowerCase());
-      if (APP_ROLE === 'admin') params.set('role', 'admin');
       const base = window.location.href.split('?')[0];
       copyText(base + (params.toString() ? '?' + params.toString() : ''), '已複製設定連結');
     }
@@ -1248,10 +1130,9 @@
 
     function switchCurrentUser() {
       CURRENT_USER = document.getElementById('currentUser').value;
-      persistCurrentUser();
+      localStorage.setItem(USER_STORAGE_KEY, CURRENT_USER);
       document.getElementById('payer').value = CURRENT_USER;
       renderHistory();
-      recalculate();
       showToast('目前使用者：' + CURRENT_USER);
     }
 
@@ -1273,15 +1154,6 @@
     async function sendExternalNotify(text, entryId) {
       const notifyUrl = (document.getElementById('notifyUrl').value || APP_CONFIG.notifyUrl || '').trim();
       if (!notifyUrl) return { ok: true, skipped: true };
-      const signature = createNotifySignature(entryId, text);
-      const log = loadNotifyLog();
-      const existing = log[signature];
-      if (existing) {
-        const lastTime = new Date(existing.sentAt || '').getTime() || 0;
-        if (Date.now() - lastTime <= NOTIFY_DEDUPE_WINDOW_MS) {
-          return { ok: true, skippedDuplicate: true, sentAt: existing.sentAt };
-        }
-      }
       try {
         const response = await fetch(notifyUrl, {
           method: 'POST',
@@ -1292,16 +1164,7 @@
             entryId: entryId
           })
         });
-        const result = await response.json();
-        if (result && result.ok !== false) {
-          log[signature] = {
-            entryId: entryId,
-            text: text,
-            sentAt: new Date().toISOString()
-          };
-          saveNotifyLog(log);
-        }
-        return result;
+        return await response.json();
       } catch (error) {
         return { ok: false, message: error.message || 'notify failed' };
       }
@@ -1376,7 +1239,7 @@
         showToast('本地已更新，但雲端寫入失敗');
       } else {
         const notifyResult = await sendExternalNotify(buildPrettyLineMessage(entry), entry.id);
-        showToast(notifyResult && notifyResult.skippedDuplicate ? '已入帳，已略過重複 LINE 發送' : (notifyResult && notifyResult.ok !== false ? (editingEntryId ? '已修改並同步 LINE' : '新增成功，已通知群組') : '已入帳，但 LINE 通知失敗'));
+        showToast(notifyResult && notifyResult.ok !== false ? (editingEntryId ? '已修改並同步 LINE' : '新增成功，已通知群組') : '已入帳，但 LINE 通知失敗');
       }
       resetFormAfterSubmit();
       await syncEntriesFromServer();
@@ -1418,7 +1281,7 @@
         showToast('本地已清帳，但雲端寫入失敗');
       } else {
         const notifyResult = await sendExternalNotify(buildPrettyLineMessage(entry), entry.id);
-        showToast(notifyResult && notifyResult.skippedDuplicate ? '清帳成功，已略過重複 LINE 發送' : (notifyResult && notifyResult.ok !== false ? '清帳成功，已通知群組' : '清帳已入帳，但 LINE 通知失敗'));
+        showToast(notifyResult && notifyResult.ok !== false ? '清帳成功，已通知群組' : '清帳已入帳，但 LINE 通知失敗');
       }
       await syncEntriesFromServer();
     }
@@ -1478,35 +1341,20 @@
 
     function renderHistory() {
       const box = document.getElementById('historyList');
-      const hint = document.getElementById('historyHint');
       box.innerHTML = '';
-      const visibleEntries = APP_ROLE === 'admin'
-        ? entries.slice()
-        : entries.filter(function(entry) { return entry.createdBy === CURRENT_USER; });
-
-      if (hint) {
-        hint.textContent = APP_ROLE === 'admin'
-          ? '編輯者模式會顯示全部紀錄；目前會優先依時間排序。'
-          : '這裡只顯示你自己建立的紀錄，方便先檢查是否有重複送出。';
-      }
-
-      if (!visibleEntries.length) {
-        box.innerHTML = '<div class="history-card">' + (APP_ROLE === 'admin' ? '目前尚無紀錄。' : '你目前尚無自己登打的紀錄。') + '</div>';
+      if (!entries.length) {
+        box.innerHTML = '<div class="history-card">目前尚無紀錄。</div>';
         return;
       }
-      visibleEntries.forEach(function(entry) {
+      entries.forEach(function(entry) {
         const canEdit = entry.createdBy === CURRENT_USER;
         const div = document.createElement('div');
-        div.className = 'history-card';
+        div.className = 'history-card' + (canEdit ? '' : ' dimmed');
         const isVoid = entry.status === 'void';
         const title = entry.type === 'expense' ? (entry.note || '未命名項目') : '手動清帳';
         const meta = entry.type === 'expense'
           ? '付款人：' + entry.payer + '｜總額：$' + formatMoney(entry.total)
           : '清帳：' + entry.from + ' ➜ ' + entry.to + '｜金額：$' + formatMoney(entry.amount);
-        const notifyMeta = getEntryNotifyMeta(entry);
-        const notifyText = notifyMeta
-          ? 'LINE：已發送 ' + String(notifyMeta.sentAt || '').replace('T', ' ').slice(0, 16)
-          : 'LINE：尚未發送或查無紀錄';
         let details = '';
         if (entry.type === 'expense') {
           details = entry.allocation.map(function(item) {
@@ -1519,12 +1367,11 @@
           '<div class="history-top">' +
             '<div>' +
               '<div class="history-title">' + (isVoid ? '❌ ' : '') + title + '</div>' +
-              '<div class="history-meta">' + meta + '<br>建立者：' + entry.createdBy + '｜時間：' + entry.updatedAt + '<br>' + notifyText + '</div>' +
+              '<div class="history-meta">' + meta + '<br>建立者：' + entry.createdBy + (canEdit ? '｜可修改' : '｜僅供查看') + '｜時間：' + entry.updatedAt + '</div>' +
             '</div>' +
             '<div class="tag-row">' +
               '<span class="tag">' + (entry.type === 'expense' ? '記帳' : '清帳') + '</span>' +
               '<span class="tag ' + (isVoid ? 'invalid' : '') + '">' + (isVoid ? '已作廢' : '有效') + '</span>' +
-              '<span class="tag">' + (notifyMeta ? '已發送' : '待確認') + '</span>' +
             '</div>' +
           '</div>' +
           '<div class="history-meta">' + details + '</div>' +
@@ -1715,24 +1562,19 @@
       setTimeout(function() { win.print(); }, 400);
     }
 
-    APP_ROLE = detectRole();
-    CURRENT_USER = detectInitialUser();
     loadConfig();
     applyUrlConfigFromQuery();
-    document.getElementById('currentUser').value = CURRENT_USER;
-    persistCurrentUser();
-    updateRoleUI();
     renderGasCode();
+    initCurrentUser();
     refreshModeSelectionUI();
     buildDetailFields();
-    document.getElementById('payer').value = CURRENT_USER;
+    renderStickyNav('record');
     document.getElementById('checkoutFrom').value = 'Rainie';
     document.getElementById('checkoutTo').value = 'Beth';
     renderCheckoutPreview();
     recalculate();
     renderHistory();
     renderLedgerPage();
-    switchPage('record');
     syncEntriesFromServer();
   </script>
 </body>
