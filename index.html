@@ -422,6 +422,30 @@
     .sticky-inner.one-button { grid-template-columns: 1fr; }
     .history-card.dimmed { opacity: .55; filter: grayscale(.15); }
 
+    .quick-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .quick-tag {
+      min-height: 36px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #fff8ef;
+      color: #a05c7b;
+      border: 1px solid #ffd9e8;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background .15s, border-color .15s;
+    }
+    .quick-tag:active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+
   </style>
 </head>
 <body>
@@ -464,7 +488,7 @@
         </div>
         <div class="field">
           <label>註記 / 項目名稱</label>
-          <textarea id="note" inputmode="text" spellcheck="true" autocomplete="on" autocapitalize="sentences" placeholder="🪄 記錄這筆魔法支出，可輸入文字、符號、數字" oninput="recalculate()"></textarea>
+          <textarea id="note" inputmode="text" spellcheck="true" autocomplete="on" autocapitalize="sentences" placeholder="🪄 記錄這筆支出的項目名稱" oninput="recalculate()"></textarea>
         </div>
       </div>
 
@@ -676,6 +700,7 @@
     let entries = [];
     let editingEntryId = null;
     let sequence = 1;
+    let isSubmitting = false;
 
     const PEOPLE = ['Beth', 'Rainie', 'Ann', '普忠家用'];
 
@@ -752,6 +777,13 @@
         ledgerBtn.textContent = '📊 查帳';
         recordBtn.classList.add('hidden');
       }
+    }
+
+    function insertQuickTag(text) {
+      const el = document.getElementById('note');
+      const cur = el.value;
+      el.value = cur ? cur + '、' + text : text;
+      recalculate();
     }
 
     function showToast(message) {
@@ -1470,13 +1502,18 @@
     }
 
         async function submitEntry() {
+      if (isSubmitting) return;
       const check = validateForm();
       const total = roundInt(document.getElementById('totalAmount').value || 0);
       const allocation = getAllocation();
       const assigned = roundInt(allocation.reduce(function(sum, item) { return sum + item.amount; }, 0));
       if (!check.ok) return alert(check.message);
       if (total !== assigned) return alert('分配總和與總額不一致。');
+      isSubmitting = true;
+      const submitBtn = document.getElementById('submitBtn');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.55'; }
 
+      try {
       const now = nowText();
       const isEditing = !!editingEntryId;
       const entry = {
@@ -1543,6 +1580,10 @@
 
       resetFormAfterSubmit();
       await syncEntriesFromServer();
+      } finally {
+        isSubmitting = false;
+        updateSubmitButtonState();
+      }
     }
 
     function getCheckoutPreviewText() {
@@ -1559,9 +1600,12 @@
     }
 
         async function submitCheckout() {
+      if (isSubmitting) return;
       const check = validateCheckout();
       if (!check.ok) return alert(check.message);
+      isSubmitting = true;
 
+      try {
       const entry = {
         id: 'C' + sequence++,
         type: 'checkout',
@@ -1618,6 +1662,9 @@
       document.getElementById('checkoutNote').value = '已轉帳';
       renderCheckoutPreview();
       await syncEntriesFromServer();
+      } finally {
+        isSubmitting = false;
+      }
     }
 
     function copyPreview() {
