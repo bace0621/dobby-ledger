@@ -337,19 +337,34 @@
     .toast {
       position: fixed;
       left: 50%;
-      bottom: calc(var(--sticky-h) + 22px);
-      transform: translateX(-50%);
-      background: rgba(75, 59, 71, 0.94);
+      bottom: calc(var(--sticky-h) + 28px);
+      transform: translateX(-50%) translateY(16px);
+      background: rgba(47, 158, 68, 0.96);
       color: #fff;
-      padding: 10px 14px;
+      padding: 14px 24px;
       border-radius: 999px;
-      font-size: 13px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+      box-shadow: 0 8px 28px rgba(47, 158, 68, 0.36), 0 2px 8px rgba(0,0,0,0.12);
       opacity: 0;
       pointer-events: none;
-      transition: opacity .25s ease;
+      transition: opacity .28s ease, transform .28s cubic-bezier(0.34, 1.56, 0.64, 1);
       z-index: 99;
     }
-    .toast.show { opacity: 1; }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.toast-error {
+      background: rgba(217, 72, 95, 0.96);
+      box-shadow: 0 8px 28px rgba(217, 72, 95, 0.36), 0 2px 8px rgba(0,0,0,0.12);
+    }
+    .toast.toast-warn {
+      background: rgba(199, 121, 43, 0.96);
+      box-shadow: 0 8px 28px rgba(199, 121, 43, 0.36), 0 2px 8px rgba(0,0,0,0.12);
+    }
 
 
     .magic-spark, .owl-fly {
@@ -786,12 +801,15 @@
       recalculate();
     }
 
-    function showToast(message) {
+    function showToast(message, type, duration) {
       const toast = document.getElementById('toast');
       toast.textContent = message;
+      toast.className = 'toast' + (type ? ' toast-' + type : '');
+      // Force reflow so transition fires even if called twice quickly
+      void toast.offsetWidth;
       toast.classList.add('show');
       clearTimeout(showToast.timer);
-      showToast.timer = setTimeout(function() { toast.classList.remove('show'); }, 1600);
+      showToast.timer = setTimeout(function() { toast.classList.remove('show'); }, duration || 3000);
     }
 
 
@@ -1553,7 +1571,7 @@
 
       if (!saveResult || !saveResult.ok) {
         showServerError('雲端寫入失敗', saveResult);
-        showToast('本地已更新，但雲端寫入失敗');
+        showToast('⚠️ 本地已更新，但雲端寫入失敗', 'error');
         return;
       }
 
@@ -1571,7 +1589,7 @@
       if (notifyResult && notifyResult.ok === false) {
         showServerError('LINE 通知失敗', notifyResult);
         magicSparkle('⚠️');
-        showToast('已入帳，但 LINE 通知失敗');
+        showToast('✅ 已入帳，但 LINE 通知失敗', 'warn');
       } else {
         magicSparkle(isEditing ? '🪄' : '✨');
         owlFly('🦉');
@@ -1633,7 +1651,7 @@
 
       if (!saveResult || !saveResult.ok) {
         showServerError('清帳雲端寫入失敗', saveResult);
-        showToast('本地已清帳，但雲端寫入失敗');
+        showToast('⚠️ 本地已清帳，但雲端寫入失敗', 'error');
         return;
       }
 
@@ -1651,7 +1669,7 @@
       if (notifyResult && notifyResult.ok === false) {
         showServerError('LINE 通知失敗', notifyResult);
         magicSparkle('⚠️');
-        showToast('清帳已入帳，但 LINE 通知失敗');
+        showToast('✅ 清帳已入帳，但 LINE 通知失敗', 'warn');
       } else {
         magicSparkle('💫');
         owlFly('🪶');
